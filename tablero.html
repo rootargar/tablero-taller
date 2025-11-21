@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero de Taller - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2rem 3rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header .subtitle {
+            font-size: 1.5rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 3rem;
+            margin-top: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            animation: pulse 2s infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 2rem 3rem;
+        }
+
+        /* Tarjetas de Estadísticas Principales */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-number {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 1.3rem;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Sección de Gráficos */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-title {
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        canvas {
+            max-height: 350px;
+        }
+
+        /* Tabla de Órdenes Recientes */
+        .table-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .table-wrapper {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #333;
+            font-weight: 700;
+            font-size: 1rem;
+            text-transform: uppercase;
+            padding: 1rem;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+            color: #333;
+            font-size: 0.95rem;
+        }
+
+        tr:hover td {
+            background-color: #f5f5f5;
+        }
+
+        .badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .badge-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        /* Estado de carga */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            font-size: 1.5rem;
+        }
+
+        .loading-spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid white;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background-color: rgba(255, 82, 82, 0.9);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin: 2rem;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+
+        /* Animación de entrada */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stat-card, .chart-container, .table-section {
+            animation: fadeIn 0.6s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 TABLERO DE TALLER</h1>
+        <div class="subtitle">Control de Órdenes de Servicio - Última Semana</div>
+        <div class="status-bar">
+            <div>
+                <span class="status-indicator"></span>
+                <span>Sistema Activo</span>
+            </div>
+            <div>
+                <span>📅 Última actualización: <span id="lastUpdate">--:--:--</span></span>
+            </div>
+            <div>
+                <span>⏱️ Próxima actualización: <span id="nextUpdate">10:00</span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Estadísticas Principales -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-number" id="totalOS">0</div>
+                <div class="stat-label">Total OS Abiertas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👤</div>
+                <div class="stat-number" id="osSinTecnico">0</div>
+                <div class="stat-label">OS Sin Técnico</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-number" id="osConTecnico">0</div>
+                <div class="stat-label">OS Con Técnico</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-number" id="promedioDias">0</div>
+                <div class="stat-label">Promedio Días Estadía</div>
+            </div>
+        </div>
+
+        <!-- Sección de Gráficos -->
+        <div class="charts-section">
+            <div class="chart-container">
+                <div class="chart-title">📊 OS por Tipo de Servicio</div>
+                <canvas id="chartTipoServicio"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">👥 OS por Cliente (Top 10)</div>
+                <canvas id="chartClientes"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">📈 OS por Día</div>
+                <canvas id="chartPorDia"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">🔄 OS por Estado Operativo</div>
+                <canvas id="chartEstadoOperativo"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabla de Órdenes Recientes -->
+        <div class="table-section">
+            <div class="table-header">
+                📋 ÓRDENES RECIENTES
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Número Orden</th>
+                            <th>Unidad</th>
+                            <th>Tipo Servicio</th>
+                            <th>Cliente</th>
+                            <th>Técnico</th>
+                            <th>Estado Operativo</th>
+                            <th>Días</th>
+                            <th>Fecha Orden</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaOrdenes">
+                        <tr>
+                            <td colspan="8" class="loading">
+                                <div class="loading-spinner"></div>
+                                Cargando datos...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="errorContainer"></div>
+
+    <script>
+        // Variables globales
+        let charts = {
+            tipoServicio: null,
+            clientes: null,
+            porDia: null,
+            estadoOperativo: null
+        };
+        let countdownInterval;
+        let timeRemaining = 600; // 10 minutos en segundos
+
+        // Función principal para cargar datos
+        async function cargarDatos() {
+            try {
+                const response = await fetch('api_tablero.php');
+
+                if (!response.ok) {
+                    throw new Error(`Error HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    actualizarEstadisticas(data.estadisticas);
+                    actualizarGraficos(data);
+                    actualizarTabla(data.ordenes);
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-MX');
+                    timeRemaining = 600; // Reiniciar contador
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarError(error.message);
+            }
+        }
+
+        // Actualizar estadísticas principales
+        function actualizarEstadisticas(stats) {
+            document.getElementById('totalOS').textContent = stats.totalOSAbiertas;
+            document.getElementById('osSinTecnico').textContent = stats.osSinTecnico;
+            document.getElementById('osConTecnico').textContent = stats.osConTecnico;
+            document.getElementById('promedioDias').textContent = stats.promedioDiasEstadia;
+        }
+
+        // Actualizar gráficos
+        function actualizarGraficos(data) {
+            // Gráfico de Tipo de Servicio
+            const ctxTipoServicio = document.getElementById('chartTipoServicio').getContext('2d');
+            if (charts.tipoServicio) charts.tipoServicio.destroy();
+
+            const tipoServicioData = Object.entries(data.osPorTipoServicio);
+            charts.tipoServicio = new Chart(ctxTipoServicio, {
+                type: 'bar',
+                data: {
+                    labels: tipoServicioData.map(item => item[0]),
+                    datasets: [{
+                        label: 'Cantidad de OS',
+                        data: tipoServicioData.map(item => item[1]),
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de Clientes
+            const ctxClientes = document.getElementById('chartClientes').getContext('2d');
+            if (charts.clientes) charts.clientes.destroy();
+
+            const clientesData = Object.entries(data.osPorCliente);
+            charts.clientes = new Chart(ctxClientes, {
+                type: 'doughnut',
+                data: {
+                    labels: clientesData.map(item => item[0]),
+                    datasets: [{
+                        data: clientesData.map(item => item[1]),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)',
+                            'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)',
+                            'rgba(255, 159, 64, 0.8)',
+                            'rgba(199, 199, 199, 0.8)',
+                            'rgba(83, 102, 255, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+
+            // Gráfico por Día
+            const ctxPorDia = document.getElementById('chartPorDia').getContext('2d');
+            if (charts.porDia) charts.porDia.destroy();
+
+            charts.porDia = new Chart(ctxPorDia, {
+                type: 'line',
+                data: {
+                    labels: data.osPorDia.map(item => {
+                        const fecha = new Date(item.Fecha);
+                        return fecha.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+                    }).reverse(),
+                    datasets: [{
+                        label: 'OS Abiertas',
+                        data: data.osPorDia.map(item => item.CantidadOS).reverse(),
+                        backgroundColor: 'rgba(118, 75, 162, 0.2)',
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de Estado Operativo
+            const ctxEstadoOp = document.getElementById('chartEstadoOperativo').getContext('2d');
+            if (charts.estadoOperativo) charts.estadoOperativo.destroy();
+
+            const estadoOpData = Object.entries(data.osPorEstadoOperativo);
+            charts.estadoOperativo = new Chart(ctxEstadoOp, {
+                type: 'bar',
+                data: {
+                    labels: estadoOpData.map(item => item[0]),
+                    datasets: [{
+                        label: 'Cantidad de OS',
+                        data: estadoOpData.map(item => item[1]),
+                        backgroundColor: 'rgba(118, 75, 162, 0.8)',
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Actualizar tabla de órdenes
+        function actualizarTabla(ordenes) {
+            const tbody = document.getElementById('tablaOrdenes');
+            tbody.innerHTML = '';
+
+            // Mostrar solo las primeras 20 órdenes
+            const ordenesLimitadas = ordenes.slice(0, 20);
+
+            ordenesLimitadas.forEach(orden => {
+                const tr = document.createElement('tr');
+
+                const tecnico = orden.NombreTecnico || '<span class="badge badge-danger">Sin Asignar</span>';
+                const estadoOp = orden.EstadoOperativo || '<span class="badge badge-warning">Sin Estado</span>';
+
+                let badgeDias = 'badge-success';
+                if (orden.DiasEstadia > 3) badgeDias = 'badge-danger';
+                else if (orden.DiasEstadia > 1) badgeDias = 'badge-warning';
+
+                tr.innerHTML = `
+                    <td><strong>${orden.NumeroOrden || ''}</strong></td>
+                    <td>${orden.Unidad || '-'}</td>
+                    <td>${orden.TipoServicio || '-'}</td>
+                    <td>${orden.NombreCliente || '-'}</td>
+                    <td>${tecnico}</td>
+                    <td>${estadoOp}</td>
+                    <td><span class="badge ${badgeDias}">${orden.DiasEstadia || 0} días</span></td>
+                    <td>${formatearFecha(orden.FechaHoraOrden)}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Formatear fecha
+        function formatearFecha(fechaStr) {
+            if (!fechaStr) return '-';
+            try {
+                const fecha = new Date(fechaStr);
+                return fecha.toLocaleDateString('es-MX') + ' ' + fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+            } catch {
+                return fechaStr;
+            }
+        }
+
+        // Mostrar mensaje de error
+        function mostrarError(mensaje) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `<div class="error-message">❌ Error: ${mensaje}</div>`;
+            setTimeout(() => {
+                errorContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        // Countdown para próxima actualización
+        function actualizarCountdown() {
+            const minutos = Math.floor(timeRemaining / 60);
+            const segundos = timeRemaining % 60;
+            document.getElementById('nextUpdate').textContent =
+                `${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+
+            if (timeRemaining <= 0) {
+                cargarDatos();
+                timeRemaining = 600; // 10 minutos
+            } else {
+                timeRemaining--;
+            }
+        }
+
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarDatos();
+
+            // Actualizar cada 10 minutos
+            setInterval(cargarDatos, 600000); // 600000ms = 10 minutos
+
+            // Actualizar countdown cada segundo
+            countdownInterval = setInterval(actualizarCountdown, 1000);
+        });
+
+        // Limpiar al cerrar
+        window.addEventListener('beforeunload', function() {
+            if (countdownInterval) clearInterval(countdownInterval);
+        });
+    </script>
+</body>
+</html>
