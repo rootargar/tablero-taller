@@ -2,10 +2,19 @@
 // Incluir el archivo de conexión
 require_once 'conexion.php';
 
+// Habilitar reporte de errores para debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // No mostrar en pantalla, solo en JSON
+
 // Configurar la respuesta como JSON
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    // Verificar que la conexión exista
+    if ($conn === false) {
+        throw new Exception("Conexión no establecida");
+    }
+
     // Calcular fecha de hace 7 días
     $fechaInicio = date('Y-m-d', strtotime('-7 days'));
     $fechaActual = date('Y-m-d');
@@ -39,9 +48,9 @@ try {
     SELECT
         o.IdOrdenServicio,
         o.NumeroOrden,
-        a.NumArticulo AS Unidad,
-        t.Nombre AS TipoServicio,
-        c.NombreCalculado AS NombreCliente,
+        ISNULL(a.NumArticulo, '-') AS Unidad,
+        ISNULL(t.Nombre, 'Sin Tipo') AS TipoServicio,
+        ISNULL(c.NombreCalculado, 'Sin Cliente') AS NombreCliente,
         o.FechaHoraOrden,
         o.FechaHoraPromEntrega,
         CASE o.estadoOrden
@@ -51,9 +60,9 @@ try {
             ELSE 'Otro'
         END AS EstadoOS,
         ta.IdTecnico,
-        ta.NombreTecnico,
-        eo.EstadoOperativo,
-        eo.DiasEstadia,
+        ISNULL(ta.NombreTecnico, NULL) AS NombreTecnico,
+        ISNULL(eo.EstadoOperativo, 'Sin Estado') AS EstadoOperativo,
+        ISNULL(eo.DiasEstadia, 0) AS DiasEstadia,
         CASE
             WHEN ta.IdTecnico IS NULL THEN 1
             ELSE 0
@@ -67,19 +76,17 @@ try {
         LEFT JOIN EstadosOperativos eo ON o.IdOrdenServicio = eo.IdOrdenServicio AND eo.Rn = 1
     WHERE
         o.estadoOrden = 'S'
-        AND o.FechaHoraOrden >= ?
+        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
         AND o.FechaHoraOrden <= GETDATE()
     ORDER BY o.NumeroOrden DESC
     ";
 
-    $stmtOrdenes = sqlsrv_prepare($conn, $sqlOrdenes, array($fechaInicio));
+    // Ejecutar consulta directamente (sin parámetros preparados por ahora)
+    $stmtOrdenes = sqlsrv_query($conn, $sqlOrdenes);
 
     if ($stmtOrdenes === false) {
-        throw new Exception("Error preparando consulta de órdenes: " . print_r(sqlsrv_errors(), true));
-    }
-
-    if (!sqlsrv_execute($stmtOrdenes)) {
-        throw new Exception("Error ejecutando consulta de órdenes: " . print_r(sqlsrv_errors(), true));
+        $errors = sqlsrv_errors();
+        throw new Exception("Error en consulta de órdenes: " . json_encode($errors, JSON_UNESCAPED_UNICODE));
     }
 
     $ordenes = array();
@@ -156,19 +163,17 @@ try {
     FROM tdsOrdenesServicio o (NOLOCK)
     WHERE
         o.estadoOrden = 'S'
-        AND o.FechaHoraOrden >= ?
+        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
         AND o.FechaHoraOrden <= GETDATE()
     GROUP BY CONVERT(VARCHAR(10), o.FechaHoraOrden, 120)
     ORDER BY Fecha DESC
     ";
 
-    $stmtPorDia = sqlsrv_prepare($conn, $sqlPorDia, array($fechaInicio));
-    if ($stmtPorDia === false) {
-        throw new Exception("Error preparando consulta por día: " . print_r(sqlsrv_errors(), true));
-    }
+    $stmtPorDia = sqlsrv_query($conn, $sqlPorDia);
 
-    if (!sqlsrv_execute($stmtPorDia)) {
-        throw new Exception("Error ejecutando consulta por día: " . print_r(sqlsrv_errors(), true));
+    if ($stmtPorDia === false) {
+        $errors = sqlsrv_errors();
+        throw new Exception("Error en consulta por día: " . json_encode($errors, JSON_UNESCAPED_UNICODE));
     }
 
     $osPorDia = array();
@@ -199,15 +204,26 @@ try {
             'fechaFin' => $fechaActual
         ],
         'ultima_actualizacion' => date('Y-m-d H:i:s')
-    ], JSON_UNESCAPED_UNICODE);
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
 } catch (Exception $e) {
-    // En caso de error, devolver mensaje de error
+    // En caso de error, devolver mensaje de error detallado
     http_response_code(500);
-    echo json_encode([
+
+    $errorResponse = [
         'success' => false,
         'error' => $e->getMessage(),
+        'file' => basename($e->getFile()),
+        'line' => $e->getLine(),
         'ultima_actualizacion' => date('Y-m-d H:i:s')
-    ], JSON_UNESCAPED_UNICODE);
+    ];
+
+    // Agregar errores de SQL Server si existen
+    $sqlErrors = sqlsrv_errors();
+    if ($sqlErrors !== null) {
+        $errorResponse['sql_errors'] = $sqlErrors;
+    }
+
+    echo json_encode($errorResponse, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 }
 ?>
