@@ -343,6 +343,14 @@
                 tabla.style.display = 'none';
 
                 const response = await fetch('datos_ordenes.php');
+
+                // Verificar si la respuesta es exitosa
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Error HTTP ${response.status}: ${errorText.substring(0, 200)}`);
+                }
+
+                // Intentar parsear el JSON
                 const data = await response.json();
 
                 if (data.success) {
