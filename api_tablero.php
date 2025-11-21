@@ -15,8 +15,8 @@ try {
         throw new Exception("Conexión no establecida");
     }
 
-    // Calcular fecha de hace 7 días
-    $fechaInicio = date('Y-m-d', strtotime('-7 days'));
+    // Calcular fecha de hace 7 días en formato ISO 8601 (YYYYMMDD) que SQL Server siempre acepta
+    $fechaInicio = date('Ymd', strtotime('-7 days'));
     $fechaActual = date('Y-m-d');
 
     // ========== CONSULTA SIMPLIFICADA - ÓRDENES ABIERTAS DE LA ÚLTIMA SEMANA ==========
@@ -42,8 +42,7 @@ try {
         LEFT JOIN invArticulos a (NOLOCK) ON o.IdArticulo = a.IdArticulo
     WHERE
         o.estadoOrden = 'S'
-        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
-        AND o.FechaHoraOrden <= GETDATE()
+        AND o.FechaHoraOrden >= '$fechaInicio'
     ORDER BY o.NumeroOrden DESC
     ";
 
@@ -78,8 +77,7 @@ try {
         INNER JOIN tdsOrdenesServicio o (NOLOCK) ON t.IdOrdenServicio = o.IdOrdenServicio
     WHERE
         o.estadoOrden = 'S'
-        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
-        AND o.FechaHoraOrden <= GETDATE()
+        AND o.FechaHoraOrden >= '$fechaInicio'
     ";
 
     $stmtTecnicos = sqlsrv_query($conn, $sqlTecnicos);
@@ -108,8 +106,7 @@ try {
         INNER JOIN tdsOrdenesServicio o (NOLOCK) ON o.IdOrdenServicio = po.IdOrdenServicio
     WHERE
         o.estadoOrden = 'S'
-        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
-        AND o.FechaHoraOrden <= GETDATE()
+        AND o.FechaHoraOrden >= '$fechaInicio'
     ";
 
     $stmtEstados = sqlsrv_query($conn, $sqlEstados);
@@ -213,8 +210,7 @@ try {
     FROM tdsOrdenesServicio o (NOLOCK)
     WHERE
         o.estadoOrden = 'S'
-        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
-        AND o.FechaHoraOrden <= GETDATE()
+        AND o.FechaHoraOrden >= '$fechaInicio'
     GROUP BY CONVERT(VARCHAR(10), o.FechaHoraOrden, 120)
     ORDER BY Fecha DESC
     ";
