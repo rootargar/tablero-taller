@@ -10,6 +10,18 @@ $connectionOptions = array(
 $conn = sqlsrv_connect($serverName, $connectionOptions);
 
 if ($conn === false) {
-    die(print_r(sqlsrv_errors(), true));
+    // Configurar la respuesta como JSON
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+
+    // Retornar error en formato JSON
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error de conexión a la base de datos',
+        'details' => sqlsrv_errors(),
+        'ultima_actualizacion' => date('Y-m-d H:i:s')
+    ], JSON_UNESCAPED_UNICODE);
+
+    exit;
 }
 ?>
