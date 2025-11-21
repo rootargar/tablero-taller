@@ -4,7 +4,7 @@ require_once 'conexion.php';
 
 // Habilitar reporte de errores para debugging
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // No mostrar en pantalla, solo en JSON
+ini_set('display_errors', 0);
 
 // Configurar la respuesta como JSON
 header('Content-Type: application/json; charset=utf-8');
@@ -19,33 +19,9 @@ try {
     $fechaInicio = date('Y-m-d', strtotime('-7 days'));
     $fechaActual = date('Y-m-d');
 
-    // ========== CONSULTA PRINCIPAL - ÓRDENES ABIERTAS DE LA ÚLTIMA SEMANA ==========
+    // ========== CONSULTA SIMPLIFICADA - ÓRDENES ABIERTAS DE LA ÚLTIMA SEMANA ==========
     $sqlOrdenes = "
-    WITH TecnicosAsignados AS (
-        SELECT
-            o.IdOrdenServicio,
-            tt.IdTecnico,
-            m.Nombre AS NombreTecnico,
-            ROW_NUMBER() OVER (PARTITION BY o.IdOrdenServicio ORDER BY t.FechaInicio DESC) AS RnTecnico
-        FROM
-            tdsTrabajosTecnicos tt (NOLOCK)
-            INNER JOIN tdsTecnicos m (NOLOCK) ON tt.IdTecnico = m.IdTecnico
-            INNER JOIN tdsTrabajos t (NOLOCK) ON t.IdTrabajo = tt.IdTrabajo
-            INNER JOIN tdsOrdenesServicio o (NOLOCK) ON t.IdOrdenServicio = o.IdOrdenServicio
-    ),
-    EstadosOperativos AS (
-        SELECT
-            po.IdOrdenServicio,
-            p.Nombre AS EstadoOperativo,
-            po.FechaHoraInicio,
-            ISNULL(po.FechaHoraFin, GETDATE()) AS FechaHoraFin,
-            DATEDIFF(DAY, po.FechaHoraInicio, ISNULL(po.FechaHoraFin, GETDATE())) AS DiasEstadia,
-            ROW_NUMBER() OVER (PARTITION BY po.IdOrdenServicio ORDER BY po.FechaHoraInicio DESC) AS Rn
-        FROM
-            tdsEstadosOperativosOrdenes po (NOLOCK)
-            INNER JOIN tdsEstadosOperativos p (NOLOCK) ON p.IdEstadoOperativo = po.IdEstadoOperativo
-    )
-    SELECT
+    SELECT TOP 100
         o.IdOrdenServicio,
         o.NumeroOrden,
         ISNULL(a.NumArticulo, '-') AS Unidad,
@@ -58,22 +34,12 @@ try {
             WHEN 'C' THEN 'Cerrada'
             WHEN 'F' THEN 'Facturada'
             ELSE 'Otro'
-        END AS EstadoOS,
-        ta.IdTecnico,
-        ISNULL(ta.NombreTecnico, NULL) AS NombreTecnico,
-        ISNULL(eo.EstadoOperativo, 'Sin Estado') AS EstadoOperativo,
-        ISNULL(eo.DiasEstadia, 0) AS DiasEstadia,
-        CASE
-            WHEN ta.IdTecnico IS NULL THEN 1
-            ELSE 0
-        END AS SinTecnico
+        END AS EstadoOS
     FROM
         tdsOrdenesServicio o (NOLOCK)
         INNER JOIN tdsTiposervicio t (NOLOCK) ON o.IdtipoServicio = t.IdtipoServicio
         INNER JOIN cpcClientes c (NOLOCK) ON c.IdCliente = o.IdCliente
         LEFT JOIN invArticulos a (NOLOCK) ON o.IdArticulo = a.IdArticulo
-        LEFT JOIN TecnicosAsignados ta ON o.IdOrdenServicio = ta.IdOrdenServicio AND ta.RnTecnico = 1
-        LEFT JOIN EstadosOperativos eo ON o.IdOrdenServicio = eo.IdOrdenServicio AND eo.Rn = 1
     WHERE
         o.estadoOrden = 'S'
         AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
@@ -81,7 +47,6 @@ try {
     ORDER BY o.NumeroOrden DESC
     ";
 
-    // Ejecutar consulta directamente (sin parámetros preparados por ahora)
     $stmtOrdenes = sqlsrv_query($conn, $sqlOrdenes);
 
     if ($stmtOrdenes === false) {
@@ -100,6 +65,91 @@ try {
         $ordenes[] = $row;
     }
     sqlsrv_free_stmt($stmtOrdenes);
+
+    // ========== OBTENER TÉCNICOS ASIGNADOS ==========
+    $sqlTecnicos = "
+    SELECT DISTINCT
+        o.IdOrdenServicio,
+        m.Nombre AS NombreTecnico
+    FROM
+        tdsTrabajosTecnicos tt (NOLOCK)
+        INNER JOIN tdsTecnicos m (NOLOCK) ON tt.IdTecnico = m.IdTecnico
+        INNER JOIN tdsTrabajos t (NOLOCK) ON t.IdTrabajo = tt.IdTrabajo
+        INNER JOIN tdsOrdenesServicio o (NOLOCK) ON t.IdOrdenServicio = o.IdOrdenServicio
+    WHERE
+        o.estadoOrden = 'S'
+        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
+        AND o.FechaHoraOrden <= GETDATE()
+    ";
+
+    $stmtTecnicos = sqlsrv_query($conn, $sqlTecnicos);
+
+    $tecnicosPorOrden = array();
+    if ($stmtTecnicos !== false) {
+        while ($row = sqlsrv_fetch_array($stmtTecnicos, SQLSRV_FETCH_ASSOC)) {
+            $idOrden = $row['IdOrdenServicio'];
+            if (!isset($tecnicosPorOrden[$idOrden])) {
+                $tecnicosPorOrden[$idOrden] = array();
+            }
+            $tecnicosPorOrden[$idOrden][] = $row['NombreTecnico'];
+        }
+        sqlsrv_free_stmt($stmtTecnicos);
+    }
+
+    // ========== OBTENER ESTADOS OPERATIVOS ==========
+    $sqlEstados = "
+    SELECT
+        po.IdOrdenServicio,
+        p.Nombre AS EstadoOperativo,
+        DATEDIFF(DAY, po.FechaHoraInicio, ISNULL(po.FechaHoraFin, GETDATE())) AS DiasEstadia
+    FROM
+        tdsEstadosOperativosOrdenes po (NOLOCK)
+        INNER JOIN tdsEstadosOperativos p (NOLOCK) ON p.IdEstadoOperativo = po.IdEstadoOperativo
+        INNER JOIN tdsOrdenesServicio o (NOLOCK) ON o.IdOrdenServicio = po.IdOrdenServicio
+    WHERE
+        o.estadoOrden = 'S'
+        AND o.FechaHoraOrden >= CAST('$fechaInicio' AS DATETIME)
+        AND o.FechaHoraOrden <= GETDATE()
+    ";
+
+    $stmtEstados = sqlsrv_query($conn, $sqlEstados);
+
+    $estadosPorOrden = array();
+    if ($stmtEstados !== false) {
+        while ($row = sqlsrv_fetch_array($stmtEstados, SQLSRV_FETCH_ASSOC)) {
+            $idOrden = $row['IdOrdenServicio'];
+            if (!isset($estadosPorOrden[$idOrden])) {
+                $estadosPorOrden[$idOrden] = array(
+                    'estado' => $row['EstadoOperativo'],
+                    'dias' => $row['DiasEstadia']
+                );
+            }
+        }
+        sqlsrv_free_stmt($stmtEstados);
+    }
+
+    // ========== COMBINAR DATOS ==========
+    foreach ($ordenes as &$orden) {
+        $idOrden = $orden['IdOrdenServicio'];
+
+        // Agregar técnicos
+        if (isset($tecnicosPorOrden[$idOrden])) {
+            $orden['NombreTecnico'] = implode(', ', $tecnicosPorOrden[$idOrden]);
+            $orden['SinTecnico'] = 0;
+        } else {
+            $orden['NombreTecnico'] = null;
+            $orden['SinTecnico'] = 1;
+        }
+
+        // Agregar estado operativo
+        if (isset($estadosPorOrden[$idOrden])) {
+            $orden['EstadoOperativo'] = $estadosPorOrden[$idOrden]['estado'];
+            $orden['DiasEstadia'] = $estadosPorOrden[$idOrden]['dias'];
+        } else {
+            $orden['EstadoOperativo'] = 'Sin Estado';
+            $orden['DiasEstadia'] = 0;
+        }
+    }
 
     // ========== CALCULAR ESTADÍSTICAS ==========
     $totalOSAbiertas = count($ordenes);
@@ -155,7 +205,7 @@ try {
 
     $promedioDiasEstadia = $contadorDias > 0 ? round($totalDiasEstadia / $contadorDias, 1) : 0;
 
-    // ========== CONSULTA ADICIONAL - OS POR DÍA (ÚLTIMOS 7 DÍAS) ==========
+    // ========== CONSULTA - OS POR DÍA (ÚLTIMOS 7 DÍAS) ==========
     $sqlPorDia = "
     SELECT
         CONVERT(VARCHAR(10), o.FechaHoraOrden, 120) AS Fecha,
@@ -171,16 +221,13 @@ try {
 
     $stmtPorDia = sqlsrv_query($conn, $sqlPorDia);
 
-    if ($stmtPorDia === false) {
-        $errors = sqlsrv_errors();
-        throw new Exception("Error en consulta por día: " . json_encode($errors, JSON_UNESCAPED_UNICODE));
-    }
-
     $osPorDia = array();
-    while ($row = sqlsrv_fetch_array($stmtPorDia, SQLSRV_FETCH_ASSOC)) {
-        $osPorDia[] = $row;
+    if ($stmtPorDia !== false) {
+        while ($row = sqlsrv_fetch_array($stmtPorDia, SQLSRV_FETCH_ASSOC)) {
+            $osPorDia[] = $row;
+        }
+        sqlsrv_free_stmt($stmtPorDia);
     }
-    sqlsrv_free_stmt($stmtPorDia);
 
     // Cerrar conexión
     sqlsrv_close($conn);
