@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Órdenes de Servicio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .status-info {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.online {
+            background-color: #4CAF50;
+        }
+
+        .status-indicator.offline {
+            background-color: #f44336;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .table-header {
+            background: #667eea;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-box {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 70vh;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .estado-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .estado-abierta {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .estado-cerrada {
+            background-color: #e8f5e8;
+            color: #388e3c;
+        }
+
+        .dias-estadia {
+            font-weight: bold;
+        }
+
+        .dias-1 { color: #4CAF50; }
+        .dias-2 { color: #FF9800; }
+        .dias-3 { color: #f44336; }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        .countdown {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .table-wrapper {
+                max-height: 60vh;
+            }
+            
+            th, td {
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+        }
+
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Dashboard de Órdenes de Servicio</h1>
+        <div class="status-bar">
+            <div class="status-info">
+                <div class="status-item">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <span id="statusText">Conectando...</span>
+                </div>
+                <div class="status-item">
+                    <span>🕒 Última actualización: <span id="lastUpdate">--</span></span>
+                </div>
+                <div class="status-item">
+                    <span class="countdown">Próxima actualización en: <span id="countdown">--</span></span>
+                </div>
+            </div>
+            <button class="refresh-btn" id="refreshBtn" onclick="cargarDatos()">🔄 Actualizar</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalOrdenes">0</div>
+                <div class="stat-label">Total Órdenes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="ordenesAbiertas">0</div>
+                <div class="stat-label">Órdenes Abiertas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="promedioEstadia">0</div>
+                <div class="stat-label">Órdenes Cerradas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="tecnicos">0</div>
+                <div class="stat-label">Órdenes Facturadas</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="table-header">
+                <h2>📊 Listado de Órdenes</h2>
+                <input type="text" class="search-box" id="searchBox" placeholder="🔍 Buscar orden, cliente, sucursal..." onkeyup="filtrarTabla()">
+            </div>
+            
+            <div id="loadingMessage" class="loading">
+                <p>⏳ Cargando datos...</p>
+            </div>
+            
+            <div id="errorMessage" class="error" style="display: none;"></div>
+            
+            <div class="table-wrapper">
+                <table id="tablaOrdenes" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>ID Orden</th>
+                            <th>Número Orden</th>
+                            <th>Estado</th>
+                            <th>Fecha Orden</th>
+                            <th>Sucursal</th>
+                            <th>Cliente</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTabla">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let intervalId;
+        let countdownId;
+        let tiempoRestante = 900; // 15 minutos en segundos
+
+        // Función para cargar datos
+        async function cargarDatos() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const tabla = document.getElementById('tablaOrdenes');
+
+            try {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '🔄 Actualizando...';
+                statusIndicator.className = 'status-indicator offline';
+                statusText.textContent = 'Cargando...';
+                loadingMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+                tabla.style.display = 'none';
+
+                const response = await fetch('datos_ordenes.php');
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarDatos(data.data);
+                    actualizarEstadisticas(data.data);
+                    statusIndicator.className = 'status-indicator online';
+                    statusText.textContent = 'Conectado';
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('es-MX');
+                    tiempoRestante = 900; // Reiniciar contador
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusIndicator.className = 'status-indicator offline';
+                statusText.textContent = 'Error de conexión';
+                errorMessage.textContent = 'Error al cargar datos: ' + error.message;
+                errorMessage.style.display = 'block';
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Actualizar';
+                loadingMessage.style.display = 'none';
+            }
+        }
+
+        // Función para mostrar datos en la tabla
+        function mostrarDatos(datos) {
+            const cuerpoTabla = document.getElementById('cuerpoTabla');
+            const tabla = document.getElementById('tablaOrdenes');
+            
+            cuerpoTabla.innerHTML = '';
+
+            datos.forEach(orden => {
+                const fila = document.createElement('tr');
+                
+                // Determinar clase del estado
+                let claseEstado = 'estado-abierta';
+                if (orden.EstadoOS === 'Cerrada') claseEstado = 'estado-cerrada';
+                else if (orden.EstadoOS === 'Facturada') claseEstado = 'estado-cerrada';
+
+                fila.innerHTML = `
+                    <td><strong>${orden.IdOrdenServicio || ''}</strong></td>
+                    <td><strong>${orden.NumeroOrden || ''}</strong></td>
+                    <td><span class="estado-badge ${claseEstado}">${orden.EstadoOS || ''}</span></td>
+                    <td>${formatearFecha(orden.FechaHoraOrden)}</td>
+                    <td>${orden.NombreSucursal || ''}</td>
+                    <td>${orden.NombreCalculado || ''}</td>
+                `;
+                
+                cuerpoTabla.appendChild(fila);
+            });
+
+            tabla.style.display = 'table';
+        }
+
+        // Función para actualizar estadísticas
+        function actualizarEstadisticas(datos) {
+            const totalOrdenes = datos.length;
+            const ordenesAbiertas = datos.filter(o => o.EstadoOS === 'Abierta').length;
+            const ordenesCerradas = datos.filter(o => o.EstadoOS === 'Cerrada').length;
+            const ordenesFacturadas = datos.filter(o => o.EstadoOS === 'Facturada').length;
+
+            document.getElementById('totalOrdenes').textContent = totalOrdenes;
+            document.getElementById('ordenesAbiertas').textContent = ordenesAbiertas;
+            document.getElementById('promedioEstadia').textContent = ordenesCerradas;
+            document.getElementById('tecnicos').textContent = ordenesFacturadas;
+        }
+
+        // Función para formatear fechas
+        function formatearFecha(fechaStr) {
+            if (!fechaStr) return '';
+            try {
+                const fecha = new Date(fechaStr);
+                return fecha.toLocaleDateString('es-MX') + ' ' + fecha.toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'});
+            } catch {
+                return fechaStr;
+            }
+        }
+
+        // Función para filtrar tabla
+        function filtrarTabla() {
+            const filtro = document.getElementById('searchBox').value.toLowerCase();
+            const filas = document.querySelectorAll('#cuerpoTabla tr');
+
+            filas.forEach(fila => {
+                const texto = fila.textContent.toLowerCase();
+                fila.style.display = texto.includes(filtro) ? '' : 'none';
+            });
+        }
+
+        // Función para actualizar countdown
+        function actualizarCountdown() {
+            const minutos = Math.floor(tiempoRestante / 60);
+            const segundos = tiempoRestante % 60;
+            document.getElementById('countdown').textContent = 
+                `${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+            
+            if (tiempoRestante <= 0) {
+                cargarDatos();
+                tiempoRestante = 900;
+            } else {
+                tiempoRestante--;
+            }
+        }
+
+        // Inicializar cuando se carga la página
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarDatos();
+            
+            // Configurar actualizaciones automáticas cada 15 minutos
+            intervalId = setInterval(cargarDatos, 900000); // 15 minutos
+            
+            // Configurar countdown cada segundo
+            countdownId = setInterval(actualizarCountdown, 1000);
+        });
+
+        // Limpiar intervalos al cerrar la página
+        window.addEventListener('beforeunload', function() {
+            if (intervalId) clearInterval(intervalId);
+            if (countdownId) clearInterval(countdownId);
+        });
+    </script>
+</body>
+</html>
