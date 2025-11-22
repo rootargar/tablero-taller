@@ -414,7 +414,7 @@
         // Función principal para cargar datos
         async function cargarDatos() {
             try {
-                const response = await fetch('api_tablero.php');
+                const response = await fetch('api_dashboard.php');
 
                 if (!response.ok) {
                     throw new Error(`Error HTTP ${response.status}`);
