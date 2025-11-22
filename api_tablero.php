@@ -1,21 +1,39 @@
 <?php
-// Incluir el archivo de conexión
-require_once 'conexion.php';
-
-// Habilitar reporte de errores para debugging
+// Configurar PRIMERO el manejo de errores
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
 
-// Configurar la respuesta como JSON
+// Configurar la respuesta como JSON ANTES de cualquier cosa
 header('Content-Type: application/json; charset=utf-8');
 
+// Función para manejar errores fatales
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        echo json_encode([
+            'success' => false,
+            'error' => 'Error fatal de PHP',
+            'details' => $error,
+            'ultima_actualizacion' => date('Y-m-d H:i:s')
+        ], JSON_UNESCAPED_UNICODE);
+    }
+});
+
 try {
-    // Verificar que la conexión exista
-    if ($conn === false) {
-        throw new Exception("Conexión no establecida");
+    // Incluir el archivo de conexión
+    if (!file_exists('conexion.php')) {
+        throw new Exception("El archivo conexion.php no existe");
     }
 
-    // Calcular fecha de hace 7 días en formato ISO 8601 (YYYYMMDD) que SQL Server siempre acepta
+    require_once 'conexion.php';
+
+    // Verificar que la conexión exista
+    if (!isset($conn) || $conn === false) {
+        throw new Exception("Conexión no establecida - variable \$conn no existe o es false");
+    }
+
+    // Calcular fecha de hace 7 días en formato ISO 8601 (YYYYMMDD)
     $fechaInicio = date('Ymd', strtotime('-7 days'));
     $fechaActual = date('Y-m-d');
 
@@ -229,7 +247,7 @@ try {
     sqlsrv_close($conn);
 
     // ========== RESPUESTA JSON ==========
-    echo json_encode([
+    $response = [
         'success' => true,
         'estadisticas' => [
             'totalOSAbiertas' => $totalOSAbiertas,
@@ -247,7 +265,9 @@ try {
             'fechaFin' => $fechaActual
         ],
         'ultima_actualizacion' => date('Y-m-d H:i:s')
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    ];
+
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     // En caso de error, devolver mensaje de error detallado
@@ -258,15 +278,29 @@ try {
         'error' => $e->getMessage(),
         'file' => basename($e->getFile()),
         'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString(),
         'ultima_actualizacion' => date('Y-m-d H:i:s')
     ];
 
     // Agregar errores de SQL Server si existen
-    $sqlErrors = sqlsrv_errors();
-    if ($sqlErrors !== null) {
-        $errorResponse['sql_errors'] = $sqlErrors;
+    if (function_exists('sqlsrv_errors')) {
+        $sqlErrors = sqlsrv_errors();
+        if ($sqlErrors !== null) {
+            $errorResponse['sql_errors'] = $sqlErrors;
+        }
     }
 
-    echo json_encode($errorResponse, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    echo json_encode($errorResponse, JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    // Capturar CUALQUIER tipo de error
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error crítico: ' . $e->getMessage(),
+        'type' => get_class($e),
+        'file' => basename($e->getFile()),
+        'line' => $e->getLine(),
+        'ultima_actualizacion' => date('Y-m-d H:i:s')
+    ], JSON_UNESCAPED_UNICODE);
 }
 ?>
