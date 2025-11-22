@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug API</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .info { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        pre {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .section {
+            margin: 20px 0;
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug API - Diagnóstico Completo</h1>
+
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = 'section';
+            div.innerHTML = `<span class="${type}">${message}</span>`;
+            output.appendChild(div);
+        }
+
+        async function debugAPI() {
+            log('📡 Iniciando llamada a API...', 'info');
+
+            try {
+                const startTime = performance.now();
+
+                const response = await fetch('api_tablero.php');
+
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(2);
+
+                log(`⏱️ Tiempo de respuesta: ${duration}ms`, 'info');
+                log(`📊 Status HTTP: ${response.status} ${response.statusText}`, response.ok ? 'info' : 'error');
+                log(`📋 Content-Type: ${response.headers.get('Content-Type')}`, 'info');
+
+                // Obtener el texto raw
+                const rawText = await response.text();
+
+                log(`📏 Longitud de respuesta: ${rawText.length} caracteres`, 'info');
+
+                // Mostrar los primeros y últimos 500 caracteres
+                const section1 = document.createElement('div');
+                section1.className = 'section';
+                section1.innerHTML = `<h3>🔤 Primeros 500 caracteres:</h3><pre>${rawText.substring(0, 500)}</pre>`;
+                output.appendChild(section1);
+
+                const section2 = document.createElement('div');
+                section2.className = 'section';
+                section2.innerHTML = `<h3>🔤 Últimos 500 caracteres:</h3><pre>${rawText.substring(Math.max(0, rawText.length - 500))}</pre>`;
+                output.appendChild(section2);
+
+                // Intentar parsear JSON
+                try {
+                    const data = JSON.parse(rawText);
+                    log('✅ JSON parseado correctamente', 'info');
+
+                    const section3 = document.createElement('div');
+                    section3.className = 'section';
+                    section3.innerHTML = `<h3>📦 Datos parseados:</h3><pre>${JSON.stringify(data, null, 2).substring(0, 2000)}...</pre>`;
+                    output.appendChild(section3);
+
+                    if (data.success) {
+                        log(`✅ API respondió exitosamente`, 'info');
+                        log(`📊 Total OS: ${data.estadisticas?.totalOSAbiertas || 0}`, 'info');
+                        log(`📋 Órdenes cargadas: ${data.ordenes?.length || 0}`, 'info');
+                    } else {
+                        log(`❌ API respondió con error: ${data.error}`, 'error');
+                    }
+
+                } catch (parseError) {
+                    log(`❌ Error al parsear JSON: ${parseError.message}`, 'error');
+
+                    // Buscar caracteres no JSON al inicio
+                    const firstChar = rawText.charCodeAt(0);
+                    log(`🔍 Primer carácter: "${rawText[0]}" (código: ${firstChar})`, 'warning');
+
+                    // Buscar si hay algo antes del JSON
+                    const jsonStart = rawText.indexOf('{');
+                    if (jsonStart > 0) {
+                        log(`⚠️ HAY ${jsonStart} caracteres ANTES del JSON:`, 'warning');
+                        const section4 = document.createElement('div');
+                        section4.className = 'section';
+                        section4.innerHTML = `<h3>⚠️ Basura antes del JSON:</h3><pre>${rawText.substring(0, jsonStart)}</pre>`;
+                        output.appendChild(section4);
+                    }
+
+                    // Mostrar texto completo si es corto
+                    if (rawText.length < 5000) {
+                        const section5 = document.createElement('div');
+                        section5.className = 'section';
+                        section5.innerHTML = `<h3>📄 Respuesta completa:</h3><pre>${rawText}</pre>`;
+                        output.appendChild(section5);
+                    }
+                }
+
+            } catch (error) {
+                log(`❌ Error en la petición: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Ejecutar al cargar
+        debugAPI();
+    </script>
+</body>
+</html>
